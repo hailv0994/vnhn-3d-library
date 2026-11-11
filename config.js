@@ -1,6 +1,6 @@
 // js/config.js — cấu hình chung (CHỈ dùng anon key, KHÔNG BAO GIỜ đưa service_role key vào đây)
 
-export const SUPABASE_URL = 'https://tdhdiudjsjtbhtqftwnv.supabase.co/rest/v1/';
+export const SUPABASE_URL = 'https://tdhdiudjsjtbhtqftwnv.supabase.co';
 export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkaGRpdWRqc2p0Ymh0cWZ0d252Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQzODIzMTAsImV4cCI6MjEwOTk1ODMxMH0.Yc0mPPfuIukggf5_sgnkLzWJZ1JmJq4hMCXaExwOFvk';
 
 export const BUCKET = 'models';
