@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Setup test — VNHN 3D Parts Library</title>
+<style>
+  body { font-family: "Meiryo UI", Arial, sans-serif; background:#fff; color:#222; max-width:760px; margin:40px auto; padding:0 16px; }
+  h1 { font-size:20px; border-bottom:2px solid #222; padding-bottom:6px; }
+  .row { display:flex; justify-content:space-between; border-bottom:1px solid #ddd; padding:10px 0; font-size:14px; }
+  .ok { color:#1a7f37; font-weight:bold; } .ng { color:#c00; font-weight:bold; } .wait { color:#888; }
+  input, button { font-family:inherit; font-size:14px; padding:6px 10px; border:1px solid #888; background:#fff; }
+  button { cursor:pointer; } button:hover { background:#222; color:#fff; }
+  fieldset { border:1px solid #ccc; margin-top:24px; } pre { background:#f5f5f5; padding:8px; font-size:12px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<h1>B1 — Kiểm tra kết nối Supabase</h1>
+<div id="results"></div>
+
+<fieldset>
+  <legend>Kiểm tra quyền admin</legend>
+  <input id="email" type="email" placeholder="email admin">
+  <input id="pw" type="password" placeholder="mật khẩu">
+  <button id="btnLogin">Đăng nhập</button>
+  <button id="btnLogout">Đăng xuất</button>
+  <pre id="adminOut"></pre>
+</fieldset>
+
+<script type="module">
+import { SUPABASE_URL, SUPABASE_ANON_KEY, BUCKET } from './js/config.js';
+import { supabase, isAdmin } from './js/supabase-client.js';
+
+const box = document.getElementById('results');
+function row(label, ok, detail = '') {
+  const d = document.createElement('div');
+  d.className = 'row';
+  d.innerHTML = `<span>${label}</span><span class="${ok ? 'ok' : 'ng'}">${ok ? 'OK' : 'NG'} ${detail}</span>`;
+  box.appendChild(d);
+}
+
+// 1. Config
+const cfgOk = !SUPABASE_URL.includes('YOUR_PROJECT_REF') && !SUPABASE_ANON_KEY.includes('YOUR_ANON_KEY');
+row('1. Đã điền SUPABASE_URL / ANON_KEY trong js/config.js', cfgOk);
+
+// 2. Key không phải service_role
+try {
+  const payload = JSON.parse(atob(SUPABASE_ANON_KEY.split('.')[1]));
+  row('2. Key là anon (không phải service_role)', payload.role === 'anon', `(role: ${payload.role})`);
+} catch { row('2. Key là anon (không phải service_role)', cfgOk && SUPABASE_ANON_KEY.startsWith('sb_publishable_'), '(key dạng publishable)'); }
+
+// 3. Đọc bảng models
+const { count, error: e1 } = await supabase.from('models').select('id', { count: 'exact', head: true });
+row('3. SELECT bảng models (RLS)', !e1, e1 ? e1.message : `(${count ?? 0} bản ghi)`);
+
+// 4. RPC is_admin tồn tại
+const { error: e2 } = await supabase.rpc('is_admin');
+row('4. Function is_admin()', !e2, e2 ? e2.message : '');
+
+// 5. Anon KHÔNG được UPDATE
+const { data: upd, error: e3 } = await supabase.from('models')
+  .update({ name: 'x' }).eq('id', '00000000-0000-0000-0000-000000000000').select();
+row('5. Anon bị chặn UPDATE', !e3 ? (upd?.length ?? 0) === 0 : true);
+
+// 6. Upload sai cấu trúc đường dẫn phải bị chặn
+const { error: e4 } = await supabase.storage.from(BUCKET)
+  .upload(`test-${Date.now()}.txt`, new Blob(['x'], { type: 'text/plain' }));
+row('6. Upload sai đường dẫn bị chặn (policy storage)', !!e4, e4 ? '' : '← policy chưa đúng!');
+
+// Admin
+const out = document.getElementById('adminOut');
+async function showAdmin() {
+  const { data: { session } } = await supabase.auth.getSession();
+  out.textContent = session
+    ? `Đăng nhập: ${session.user.email}\nis_admin: ${await isAdmin()}`
+    : 'Chưa đăng nhập';
+}
+document.getElementById('btnLogin').onclick = async () => {
+  const { error } = await supabase.auth.signInWithPassword({
+    email: document.getElementById('email').value.trim(),
+    password: document.getElementById('pw').value,
+  });
+  if (error) out.textContent = 'Lỗi: ' + error.message; else showAdmin();
+};
+document.getElementById('btnLogout').onclick = async () => { await supabase.auth.signOut(); showAdmin(); };
+showAdmin();
+</script>
+</body>
+</html>
